@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Carte interactive des Hotspots à mégots - Eysines</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    /* Étend la largeur max du conteneur global */
+    .leaflet-popup-content-wrapper.custom-popup {
+      max-width: none !important;
+      width: auto !important;
+      padding: 10px;
+    }
+
+    /* Contenu du popup en ligne */
+    .leaflet-popup-content.custom-popup-content {
+      display: flex;
+      flex-direction: row;
+      align-items: flex-start;
+      gap: 16px;
+      margin: 0;
+      padding: 0;
+    }
+
+    /* Chaque colonne (texte ou image) prend la même largeur */
+    .leaflet-popup-content.custom-popup-content > div {
+      flex: 1;
+    }
+
+    /* Image bien responsive */
+    .leaflet-popup-content.custom-popup-content img {
+      max-width: 100%;
+      height: auto;
+      object-fit: contain;
+      border-radius: 8px;
+    }
+
+    /* Mode responsive mobile */
+    @media (max-width: 600px) {
+      .leaflet-popup-content.custom-popup-content {
+        flex-direction: column !important;
+      }
+    }
+
+    .custom-popup img {
+      max-height: 400px; /* Ajuste la hauteur max de l'image */
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #f0f0f0; /* fond gris si tu veux aussi */
+      display: flex;
+      flex-direction: column;
+      align-items: center; /* centre horizontalement les éléments */
+    }
+
+    h2 {
+      text-align: left;
+      margin: 20px 0 0 16px;
+      padding: 0;
+      z-index: 1002;
+    }
+
+    #map {
+      width: 95vw; /* 95% de la largeur de l’écran */
+      max-width: 100%; /* ne dépasse jamais l’écran */
+      height: 90vh; /* 80% de la hauteur de l’écran */
+      border-radius: 12px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.2);
+      margin: 20px auto;
+    }
+
+    .legend {
+      background: white;
+      line-height: 1.4em;
+      padding: 10px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.2);
+      font-size: 14px;
+    }
+
+    .legend i {
+      width: 18px;
+      height: 18px;
+      float: left;
+      margin-right: 8px;
+      opacity: 0.8;
+      border-radius: 3px;
+    }
+
+    #searchBox {
+      position: fixed;
+      top: 70px;
+      right: 60px;
+      z-index: 1001;
+      width: 90vw;
+      max-width: 500px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      background: white;
+      margin-top: 50px;
+    }
+
+    .north-arrow {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 60px;
+      height: auto;
+      z-index: 1000;
+      opacity: 0.8;
+    }
+
+    .maps-link {
+      display: block;
+      margin-top: 10px;
+      color: #007bff;
+      text-decoration: none;
+    }
+
+    .maps-link:hover {
+      text-decoration: underline;
+    }
+  </style>
+  <button id="resetView" style="
+    position: fixed;
+    top: 120px; /* Juste en dessous de la barre de recherche */
+    right: 60px;
+    z-index: 1001;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 6px;
+    background: #007bff;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+  ">
+    Recentrer la carte
+  </button>
+</head>
+<body>
+
+  <h2>Carte interactive des Hotspots à mégots – Eysines</h2>
+  <input
+    type="text"
+    id="searchBox"
+    placeholder="Rechercher un hotspot (ID, état, type de sol, nom)…"
+    style="width: 90%; max-width: 500px; padding: 8px 12px; margin-top: 10px; border-radius: 6px; border: 1px solid #ccc;"
+  >
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script>
+    document.getElementById('resetView').addEventListener('click', () => {
+      map.setView([44.88, -0.64], 13); // ou ta vue par défaut
+    });
+
+    const map = L.map('map').setView([44.88, -0.64], 13);
+    map.locate({ setView: true, maxZoom: 19 });
+    L.control.scale({ imperial: false }).addTo(map);
+
+    function onLocationFound(e) {
+      const radius = e.accuracy / 2;
+
+      // Ajoute un marqueur à la position de l'utilisateur
+      L.marker(e.latlng)
+        .addTo(map)
+        .bindPopup("Vous êtes ici (approximativement à " + radius.toFixed(0) + " m)")
+        .openPopup();
+
+      // Cercle de précision autour de la position
+      L.circle(e.latlng, radius).addTo(map);
+    }
+
+    function onLocationError(e) {
+      alert("Géolocalisation impossible : " + e.message);
+    }
+
+    map.on('locationfound', onLocationFound);
+    map.on('locationerror', onLocationError);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    // ➤ Définition de la couleur basée sur la QUALIFICAT
+    function getColor(QUALIFICAT) {
+      if (!QUALIFICAT) return 'black';
+
+      const q = QUALIFICAT.toLowerCase().trim(); // mise en minuscules + suppression des espaces
+
+      if (q === 'forte présence de mégots') return 'red';
+      if (q === 'absence de mégots') return 'yellow';
+      if (q === 'mégots en quantité prononcé') return 'orange';
+      if (q === 'quelques mégots sporadiques') return 'yellow';
+
+      return 'gray'; // valeur par défaut si rien ne correspond
+    }
+
+    // ➤ Style des polygones (avec un contrôle de QUALIFICAT)
+    function styleFeature(feature) {
+      const qualif = feature.properties?.QUALIFICAT;
+      console.log('Données du polygone:', feature.properties); // Débogage pour voir toutes les propriétés
+      console.log('QUALIFICAT:', qualif); // Débogage pour vérifier la QUALIFICAT
+      return {
+        color: getColor(qualif), // Applique la couleur selon la QUALIFICAT
+        weight: 2,
+        fillColor: getColor(qualif),
+        fillOpacity: 0.8
+      };
+    }
+
+    // ➤ Calcul du centroïde du polygone (latitude et longitude moyens)
+    function getCentroid(geometry) {
+      let coords;
+
+      if (geometry.type === "Polygon") {
+        coords = geometry.coordinates[0];
+      } else if (geometry.type === "MultiPolygon") {
+        coords = geometry.coordinates[0][0]; // Si multipolygone, on prend le premier polygone
+      } else {
+        return [0, 0]; // Valeur par défaut si on ne trouve pas de coordonnées valides
+      }
+
+      let x = 0, y = 0;
+      coords.forEach(pt => {
+        x += pt[0]; // Longitude
+        y += pt[1]; // Latitude
+      });
+      const len = coords.length;
+      return [y / len, x / len]; // [latitude, longitude]
+    }
+
+    // ➤ Gestion des popups
+    function onEachFeature(feature, layer) {
+      const props = feature.properties || {};
+      const TYPE_LIEU = props.TYPE_LIEU || "Nom inconnu";
+      const QUALIFICAT = props.QUALIFICAT || "Non précisé";
+      const ID = props.ID || "Non précisé";
+      const AREA = props.AREA || "Non précisé";
+      const Sol = props.Sol || "Non précisé";
+      // Gestion de la coordonnée 'COORDONN_E'
+      let coord = props.COORDONN_E || "Non précisé";
+      let coordLatitude, coordLongitude;
+
+      // Si 'COORDONN_E' est une chaîne avec une coordonnée sous la forme "latitude,longitude"
+      if (coord && typeof coord === "string") {
+        const coordsArray = coord.split(',');
+        if (coordsArray.length === 2) {
+          coordLatitude = parseFloat(coordsArray[0]);
+          coordLongitude = parseFloat(coordsArray[1]);
+        } else {
+          coordLatitude = coordLongitude = "Non précisé";
+        }
+      } else {
+        coordLatitude = coordLongitude = "Non précisé";
+      }
+
+      const centroid = getCentroid(feature.geometry);
+
+      let popupContent = `
+      <div class="custom-popup-content">
+        <div>
+          <b>Nom :</b> ${TYPE_LIEU}<br>
+          <b>Etat du hotspot :</b> ${QUALIFICAT}<br>
+          <b>ID :</b> ${ID}<br>
+          <b>Aire (m2) :</b> ${AREA}<br>
+          <b>Type de sol :</b> ${Sol}<br>
+          <b>Coordonnées :</b><br>
+          &nbsp;&nbsp;- Latitude : ${centroid[0].toFixed(5)}<br>
+          &nbsp;&nbsp;- Longitude : ${centroid[1].toFixed(5)}<br>
+        </div>
+      `;
+
+      if (ID === 73 || ID === "73") {
+        popupContent += `
+          <div>
+            <img src="https://raw.githubusercontent.com/Axeloiu/Eysines-/main/Image%20id%2073.jpg"
+                 alt="Photo du lieu">
+          </div>`;
+      }
+      if (ID === 39 || ID === "39") {
+        popupContent += `
+          <div>
+            <img src="https://raw.githubusercontent.com/Axeloiu/Eysines-/main/caf%C3%A9%201.JPG"
+                 alt="Image devant le café">
+          </div>`;
+      }
+      if (ID === 36 || ID === "36") {
+        popupContent += `
+          <div>
+            <img src="https://raw.githubusercontent.com/Axeloiu/Eysines-/main/devant%20maison.jpg"
+                 alt="Devant maison">
+          </div>`;
+      }
+      if (ID === 43 || ID === "43") {
+        popupContent += `
+          <div>
+            <img src="https://raw.githubusercontent.com/Axeloiu/Eysines-/main/devant%20commerce.jpg"
+                 alt="Devant commerce">
+          </div>`;
+      }
+      if (ID === 17 || ID === "17") {
+        popupContent += `
+          <div>
+            <img src="https://raw.githubusercontent.com/Axeloiu/Eysines-/main/commerce%20centre%20commercial.jpg"
+                 alt="commerce centre commercial">
+          </div>`;
+      }
+      popupContent += `</div>`;
+
+      // Attacher le popup avec la classe personnalisée
+      layer.bindPopup(popupContent, {
+        className: 'custom-popup',
+        maxWidth: 9999
+      });
+
+      // Et ensuite tu ajoutes le layer à la liste des hotspots pour la recherche
+      hotspotLayers.push({
+        layer: layer,
+        props: feature.properties
+      });
+    }
+
+    const hotspotLayers = [];
+    let searchResults = [];
+    let currentResultIndex = 0;
+
+    // ➤ Chargement des limites administratives (ajout de la zone d'Eysines)
+    fetch("https://raw.githubusercontent.com/Axeloiu/Eysines-/refs/heads/main/LIMITE_EYSINES.geojson")
+      .then(res => res.json())
+      .then(data => {
+        L.geoJSON(data, {
+          style: {
+            color: "blue",
+            weight: 4,
+            fillOpacity: 0
+          }
+        }).addTo(map);
+      })
+      .catch(err => console.error("Erreur chargement limites:", err));
+
+    // ➤ Chargement des hotspots
+    fetch("https://raw.githubusercontent.com/Axeloiu/Eysines-/refs/heads/main/HOTSPOTS.geojson")
+      .then(res => res.json())
+      .then(data => {
+        console.log('Données GeoJSON chargées:', data); // Affiche les données complètes dans la console
+
+        // Appliquer le style et les popups aux hotspots
+        L.geoJSON(data, {
+          style: styleFeature,
+          onEachFeature: onEachFeature
+        }).addTo(map);
+      })
+      .catch(err => console.error("Erreur chargement hotspots:", err));
+
+    // ➤ Chargement des cendriers
+    fetch("https://raw.githubusercontent.com/Axeloiu/Eysines-/refs/heads/main/Cendriers2.geojson")
+      .then(res => res.json())
+      .then(data => {
+        const cendriersLayer = L.geoJSON(data, {
+          pointToLayer: function (feature, latlng) {
+            return L.circleMarker(latlng, {
+              radius: 15, // Augmentez le rayon pour agrandir les points
+              fillColor: "Purple",
+              color: "#000",
+              weight: 1,
+              opacity: 1,
+              fillOpacity: 0.8
+            });
+          },
+          onEachFeature: onEachCendrierFeature
+        }).addTo(map);
+
+        // Amener les points des cendriers au premier plan
+        cendriersLayer.bringToFront();
+      })
+      .catch(err => console.error("Erreur chargement cendriers:", err));
+
+    function onEachCendrierFeature(feature, layer) {
+      const props = feature.properties || {};
+      const id = props.id || "Non précisé";
+      const coord = props.Coord || "Non précisé";
+
+      let popupContent = `
+        <div class="custom-popup-content">
+          <div>
+            <b>ID :</b> ${id}<br>
+            <b>Coordonnées :</b> ${coord}<br>
+            <a class="maps-link" href="https://www.google.com/maps?q=${coord}" target="_blank">Ouvrir dans Google Maps</a>
+          </div>
+          <div>
+            <img src="https://github.com/Axeloiu/Eysines-/raw/main/${id}.jpg" alt="Image du cendrier">
+          </div>
+        </div>
+      `;
+
+      layer.bindPopup(popupContent, {
+        className: 'custom-popup',
+        maxWidth: 9999
+      });
+    }
+
+    const legend = L.control({ position: 'bottomright' });
+
+    const searchInput = document.getElementById('searchBox');
+
+    searchInput.addEventListener('input', function (e) {
+      const query = e.target.value.toLowerCase().trim();
+      searchResults = [];
+      currentResultIndex = 0;
+
+      if (!query || query.length < 1) return;
+
+      searchResults = hotspotLayers.filter(({ props }) => {
+        const idMatch = !isNaN(query) && props.ID?.toString() === query;
+        const qualifMatch = props.QUALIFICAT?.toLowerCase().includes(query);
+        const solMatch = props.Sol?.toLowerCase().includes(query);
+        const lieuMatch = props.TYPE_LIEU?.toLowerCase().includes(query);
+        return idMatch || qualifMatch || solMatch || lieuMatch;
+      });
+
+      if (searchResults.length > 0) {
+        focusOnResult(0); // Affiche le premier résultat
+      }
+    });
+
+    // Quand on appuie sur Entrée
+    searchInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && searchResults.length > 1) {
+        currentResultIndex = (currentResultIndex + 1) % searchResults.length;
+        focusOnResult(currentResultIndex);
+      }
+    });
+
+    function focusOnResult(index) {
+      const result = searchResults[index];
+      if (!result) return;
+      const layer = result.layer;
+      const centroid = getCentroid(layer.feature.geometry);
+      map.setView(centroid, 20);
+      layer.openPopup();
+    }
+
+    legend.onAdd = function (map) {
+      const div = L.DomUtil.create('div', 'legend');
+      div.innerHTML += '<b>Légende</b><br>';
+      div.innerHTML += '<i style="background: red"></i> Forte présence de mégots<br>';
+      div.innerHTML += '<i style="background: orange"></i> Mégots en quantité prononcé<br>';
+      div.innerHTML += '<i style="background: yellow"></i> Quelques mégots sporadiques<br>';
+      div.innerHTML += '<i style="background: Purple"></i> Cendriers<br>';
+      return div;
+    };
+
+    legend.addTo(map);
+  </script>
+</body>
+</html>
