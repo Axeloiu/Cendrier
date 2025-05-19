@@ -112,6 +112,17 @@
       z-index: 1000;
       opacity: 0.8;
     }
+
+    .maps-link {
+      display: block;
+      margin-top: 10px;
+      color: #007bff;
+      text-decoration: none;
+    }
+
+    .maps-link:hover {
+      text-decoration: underline;
+    }
   </style>
   <button id="resetView" style="
     position: fixed;
@@ -181,7 +192,7 @@
       const q = QUALIFICAT.toLowerCase().trim(); // mise en minuscules + suppression des espaces
 
       if (q === 'forte présence de mégots') return 'red';
-      if (q === 'absence de mégots') return 'gray';
+      if (q === 'absence de mégots') return 'yellow';
       if (q === 'mégots en quantité prononcé') return 'orange';
       if (q === 'quelques mégots sporadiques') return 'yellow';
 
@@ -346,38 +357,42 @@
       .catch(err => console.error("Erreur chargement hotspots:", err));
 
     // ➤ Chargement des cendriers
-    // ➤ Chargement des cendriers
-fetch("https://raw.githubusercontent.com/Axeloiu/Eysines-/refs/heads/main/Cendriers.geojson")
-  .then(res => res.json())
-  .then(data => {
-    const cendriersLayer = L.geoJSON(data, {
-      pointToLayer: function (feature, latlng) {
-        return L.circleMarker(latlng, {
-          radius: 15, // Augmentez le rayon pour agrandir les points
-          fillColor: "#ff7800",
-          color: "#000",
-          weight: 1,
-          opacity: 1,
-          fillOpacity: 0.8
-        });
-      },
-      onEachFeature: onEachCendrierFeature
-    }).addTo(map);
+    fetch("https://raw.githubusercontent.com/Axeloiu/Eysines-/refs/heads/main/Cendriers2.geojson")
+      .then(res => res.json())
+      .then(data => {
+        const cendriersLayer = L.geoJSON(data, {
+          pointToLayer: function (feature, latlng) {
+            return L.circleMarker(latlng, {
+              radius: 15, // Augmentez le rayon pour agrandir les points
+              fillColor: "Purple",
+              color: "#000",
+              weight: 1,
+              opacity: 1,
+              fillOpacity: 0.8
+            });
+          },
+          onEachFeature: onEachCendrierFeature
+        }).addTo(map);
 
-    // Amener les points des cendriers au premier plan
-    cendriersLayer.bringToFront();
-  })
-  .catch(err => console.error("Erreur chargement cendriers:", err));
-
+        // Amener les points des cendriers au premier plan
+        cendriersLayer.bringToFront();
+      })
+      .catch(err => console.error("Erreur chargement cendriers:", err));
 
     function onEachCendrierFeature(feature, layer) {
       const props = feature.properties || {};
       const id = props.id || "Non précisé";
+      const coord = props.Coord || "Non précisé";
 
       let popupContent = `
         <div class="custom-popup-content">
           <div>
             <b>ID :</b> ${id}<br>
+            <b>Coordonnées :</b> ${coord}<br>
+            <a class="maps-link" href="https://www.google.com/maps?q=${coord}" target="_blank">Ouvrir dans Google Maps</a>
+          </div>
+          <div>
+            <img src="https://github.com/Axeloiu/Eysines-/raw/main/${id}.jpg" alt="Image du cendrier">
           </div>
         </div>
       `;
@@ -435,8 +450,7 @@ fetch("https://raw.githubusercontent.com/Axeloiu/Eysines-/refs/heads/main/Cendri
       div.innerHTML += '<i style="background: red"></i> Forte présence de mégots<br>';
       div.innerHTML += '<i style="background: orange"></i> Mégots en quantité prononcé<br>';
       div.innerHTML += '<i style="background: yellow"></i> Quelques mégots sporadiques<br>';
-      div.innerHTML += '<i style="background: gray"></i> Absence de mégots<br>';
-      div.innerHTML += '<i style="background: #ff7800"></i> Emplacement potentiel de Cendriers<br>';
+      div.innerHTML += '<i style="background: Purple"></i> Emplacement potentiel de cendriers<br>';
       return div;
     };
 
